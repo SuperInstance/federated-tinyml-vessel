@@ -1,0 +1,8 @@
+[package]
+name = "verify_rust"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "verify_rust"
+path = "src/main.rs"

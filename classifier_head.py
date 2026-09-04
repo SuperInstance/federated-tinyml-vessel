@@ -17,9 +17,15 @@ is the FNV-1a equivalent: 4 bytes per fp32 weight, 4 bytes per bias,
 320+5 = 1,300 bytes total. The state hash is the device's "model id".
 """
 from __future__ import annotations
+import json
 import numpy as np
 import struct
 from typing import List, Tuple
+
+
+# Defaults: the F170 production head
+NUM_CLASSES = 5      # silence, normal, wind, net_haul, line_tangle
+HEAD_DIM = 64        # the frozen backbone output
 
 
 FNV_OFFSET = 0xCBF29CE484222325
@@ -157,6 +163,36 @@ class ClassifierHead:
         head.biases = np.array(d["biases"], dtype=np.float32)
         head.steps = d["steps"]
         head.samples_seen = d["samples_seen"]
+        return head
+
+    def to_json_envelope(self, round: int = 0, samples_seen: int = None, device_id: str = "global") -> str:
+        """The F170 wire envelope as a JSON string.
+
+        The envelope wraps the head with schema versioning, round info,
+        and the state hash. The state hash is the canonical identity.
+        """
+        envelope = {
+            "schema": "f170-head-v1",
+            "device_id": device_id,
+            "round": round,
+            "samples_seen": samples_seen if samples_seen is not None else self.samples_seen,
+            "W": self.weights.tolist(),
+            "b": self.biases.tolist(),
+            "num_classes": self.num_classes,
+            "embedding_dim": self.embedding_dim,
+            "steps": self.steps,
+            "state_hash": f"0x{self.state_hash():016x}",
+        }
+        return json.dumps(envelope)
+
+    @classmethod
+    def from_json_envelope(cls, msg: dict) -> "ClassifierHead":
+        """Parse a head from a wire envelope JSON dict."""
+        head = cls(num_classes=msg["num_classes"], embedding_dim=msg["embedding_dim"])
+        head.weights = np.array(msg["W"], dtype=np.float32)
+        head.biases = np.array(msg["b"], dtype=np.float32)
+        head.steps = msg.get("steps", 0)
+        head.samples_seen = msg.get("samples_seen", 0)
         return head
 
 

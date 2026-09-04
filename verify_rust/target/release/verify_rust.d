@@ -1,0 +1,1 @@
+/run/csi/mount-root/nas/eab0d61a99b6696edb3d2aff87b585e8/tinyml-federated/verify_rust/target/release/verify_rust: /run/csi/mount-root/nas/eab0d61a99b6696edb3d2aff87b585e8/tinyml-federated/verify_rust/src/main.rs

@@ -109,3 +109,52 @@ MIT. Use it. Ship it. Tell us about it.
 > The wire is the round. The aggregator is the consensus.
 > The fleet is the corpus. The captain is the witness.
 > The 1.3 KB is the truth.
+
+## F170 R&D v0.2: Quantization + Aggregator + Multi-substrate
+
+This version adds three new R&D directions:
+
+### 1. INT4 quantization (`quantize.py`)
+The head can be quantized to 4-bit weights (2 per byte) and 8-bit biases:
+- **fp32**: 1300 bytes (1.27 KB)
+- **int8**: 333 bytes (0.33 KB) — 25.6% of fp32
+- **int4**: 173 bytes (0.17 KB) — 13.3% of fp32, **7.5x smaller**
+
+All three maintain 100% test accuracy on the synthetic data.
+
+### 2. Real aggregator server (`aggregator.py`)
+A working HTTP aggregator that:
+- Accepts head uploads from devices via POST /head
+- Runs FedAvg when 3+ devices have submitted
+- Serves the current global head via GET /global
+- Tracks history via GET /stats
+- Supports reset via POST /reset
+
+Run: `python3 aggregator.py --port 8765`
+Demo: `python3 aggregator.py --demo`
+
+### 3. On-device client (`device_client.py`)
+A simulated device that:
+- Fetches the current global head
+- Runs local SGD on its own audio data
+- Uploads the updated head
+- Repeats
+
+Run 5 devices in parallel: `for i in 0 1 2 3 4; do python3 device_client.py --device-id device-$i --preferred-class $i --aggregator http://localhost:8765 & done`
+
+### 4. C port (`c_port/f170_head.c` and `c_port/f170_head_int4.c`)
+Byte-exact TFLite-Micro-compatible C port. Both fp32 (1.3 KB) and int4 (0.17 KB) versions. All 4 substrates (Python/JS/C/Rust) compute the same FNV-1a 64-bit state hash for the same head bytes.
+
+### 5. Rust crate (`quilt-rust/crates/federated-tinyml`)
+11/11 tests pass. The Rust port with FNV-1a verified byte-exact.
+
+## Multi-substrate polyformalism
+
+| Substrate | State hash (test) |
+|---|---|
+| **Python** | `0x5fd69fcc4833d9fc` |
+| **JavaScript** | `0x5fd69fcc4833d9fc` |
+| **C** | `0x5fd69fcc4833d9fc` |
+| **Rust** | `0x5fd69fcc4833d9fc` |
+
+A head trained in any substrate is bit-identical when loaded in any other.
