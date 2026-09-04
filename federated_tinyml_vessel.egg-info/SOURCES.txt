@@ -1,0 +1,12 @@
+README.md
+classifier_head.py
+feature_extractor.py
+federated.py
+setup.py
+simulator.py
+study.py
+federated_tinyml_vessel.egg-info/PKG-INFO
+federated_tinyml_vessel.egg-info/SOURCES.txt
+federated_tinyml_vessel.egg-info/dependency_links.txt
+federated_tinyml_vessel.egg-info/requires.txt
+federated_tinyml_vessel.egg-info/top_level.txt
