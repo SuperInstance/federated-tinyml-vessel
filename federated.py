@@ -81,7 +81,11 @@ def non_iid_split(X: np.ndarray, y: np.ndarray, n_devices: int,
             cumulative += count
     out = []
     for d in range(n_devices):
-        idx = np.array(per_device_indices[d])
+        # dtype=int keeps an empty shard a valid index array: at very low alpha a
+        # device can be allotted zero samples, and np.array([]) would otherwise be
+        # float64 and raise when used to index. Such a device simply sits out each
+        # round (handled in the training loop).
+        idx = np.array(per_device_indices[d], dtype=int)
         rng.shuffle(idx)
         out.append((X[idx], y[idx]))
     return out
@@ -133,8 +137,13 @@ def federated_train(n_rounds: int = 30,
     head_trajectory = [global_head.flat_state()]
     for rnd in range(n_rounds):
         device_heads = []
+        device_weights = []
         device_losses = []
         for d, (X_local, y_local) in enumerate(device_data):
+            # A device allotted no samples this split (possible at very low alpha)
+            # can't train, so it sits the round out rather than crashing.
+            if len(X_local) == 0:
+                continue
             # Each device gets a copy of the global head (the broadcast)
             local_head = ClassifierHead.from_bytes(global_head.to_bytes(),
                                                    num_classes=global_head.num_classes,
@@ -147,12 +156,17 @@ def federated_train(n_rounds: int = 30,
                                                     local_steps=local_steps,
                                                     learning_rate=learning_rate)
             device_heads.append(updated_head)
+            device_weights.append(len(X_local))  # FedAvg weight = data size
             device_losses.append(loss)
 
-        # FedAvg
-        # Weight by data size (more data = more weight)
-        weights = [len(X_local) for X_local, _ in device_data]
-        global_head = average_heads(device_heads, weights=weights)
+        if not device_heads:
+            raise ValueError(
+                f"round {rnd}: no device had any data (alpha={alpha} too low for "
+                f"{n_devices} devices). Raise alpha or samples_per_class."
+            )
+
+        # FedAvg — weighted by data size, over the devices that participated.
+        global_head = average_heads(device_heads, weights=device_weights)
 
         # Evaluate
         correct = 0
