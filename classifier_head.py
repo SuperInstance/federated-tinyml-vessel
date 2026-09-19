@@ -133,6 +133,14 @@ class ClassifierHead:
                 h = (h * FNV_PRIME) & MASK
         return h
 
+    def flat_state(self) -> np.ndarray:
+        """The head as one flat parameter vector (weights then biases) — a point
+        in the 325-D parameter space. Successive rounds' flat states form the
+        convergence trajectory read by ``gesture.convergence_geometry``."""
+        return np.concatenate(
+            [self.weights.astype(np.float32).ravel(), self.biases.astype(np.float32).ravel()]
+        )
+
     def to_bytes(self) -> bytes:
         return self.weights.astype(np.float32).tobytes() + self.biases.astype(np.float32).tobytes()
 
