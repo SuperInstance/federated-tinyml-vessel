@@ -70,6 +70,7 @@ TFLite Micro ESP32.
 | `classifier_head.py` | 7,657 | 200 | The trainable 64x5 head (325 params) |
 | `simulator.py` | 5,213 | 110 | Synthetic vessel-audio generator (5 classes) |
 | `federated.py` | 8,305 | 220 | The federated training loop (N devices, FedAvg) |
+| `gesture.py` | ~7,000 | 200 | Convergence geometry — the head's path read as a gesture |
 | `study.py` | 1,701 | 50 | The 6-experiment comparison study |
 | `README.md` | this | - | This file |
 
@@ -79,6 +80,39 @@ Total: ~35 KB of Python, ~830 lines, polyformal.
 
 - Frozen backbone: `0x9627430ac5be8c8d` (constant across all experiments)
 - Head hashes vary per round and per experiment (see `study.py` output)
+
+## Convergence geometry
+
+The final accuracy is a *point*. But the global head **moved** to get there —
+each round, FedAvg takes a step through the 325-D parameter space, and those steps
+trace a path. [`gesture.py`](gesture.py) reads the shape of that path, so
+`federated_train(...)` now returns a `convergence_geometry` block:
+
+```python
+r = federated_train(n_devices=5, n_rounds=12, alpha=0.3, verbose=False)
+r["convergence_geometry"]
+# {'rounds': 13, 'arc_length': ...,   # total distance the head travelled
+#  'final_step': ...,                 # how far the last round moved (has it settled?)
+#  'bending_energy': ..., 'mean_bending': ...,  # oscillation of the descent
+#  'twist_energy': ..., 'planarity': ...}       # does convergence open new dimensions?
+```
+
+Read **order by order**: `arc_length`/`heading` (how far, and where it's going —
+the `d_mu`), `bending_energy` (curvature — turning *within* a plane, i.e. an
+aggregation that oscillates vs. one that descends smoothly), and `twist_energy`
+(torsion — turning *out of* the plane, into a fresh direction of parameter
+space). This is the SuperInstance fleet's shared "abstraction as gesture" reading
+— a tensor approximates a function; we approximate the *shape of the motion* —
+the same three orders that read notes ([musician-soul](https://github.com/SuperInstance/musician-soul)),
+rooms ([elephant](https://github.com/SuperInstance/elephant)), conversations
+([tensor-midi](https://github.com/SuperInstance/tensor-midi)) and cell state
+([quilt](https://github.com/SuperInstance/quilt)). *The property is in the twist*
+([twist-engine](https://github.com/SuperInstance/twist-engine)).
+
+Honest note: whether twist tracks non-IID skew is an open hypothesis — a quick
+seed sweep at moderate skew did not show a clear effect. Treat these as an
+*observable* of the convergence path, not a validated non-IID detector. Run
+`python gesture.py` for the self-test.
 
 ## The 5 classes
 

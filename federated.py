@@ -24,6 +24,7 @@ from typing import List, Dict, Tuple
 from feature_extractor import FeatureExtractor
 from classifier_head import ClassifierHead, average_heads
 from simulator import generate_dataset, split_train_test, CLASSES
+from gesture import convergence_geometry
 
 
 def device_local_train(fe: FeatureExtractor,
@@ -127,6 +128,9 @@ def federated_train(n_rounds: int = 30,
     test_embeddings = fe.embed_batch(X_test)
 
     history = []
+    # The global head's path through parameter space, one flat state per round
+    # (starting from the initial broadcast) — read as a convergence gesture below.
+    head_trajectory = [global_head.flat_state()]
     for rnd in range(n_rounds):
         device_heads = []
         device_losses = []
@@ -165,6 +169,7 @@ def federated_train(n_rounds: int = 30,
             "test_accuracy": test_acc,
             "head_state_hash": head_hash,
         })
+        head_trajectory.append(global_head.flat_state())
         if verbose:
             print(f"  round {rnd:3d}: loss={mean_loss:.4f}  test_acc={test_acc:.3f}  head={head_hash}")
 
@@ -174,6 +179,9 @@ def federated_train(n_rounds: int = 30,
         "feature_extractor": fe,
         "history": history,
         "final_test_acc": final_test_acc,
+        # The shape of how the global head converged — arc length, bending
+        # (oscillation) and twist (non-IID tension). See gesture.py.
+        "convergence_geometry": convergence_geometry(head_trajectory),
     }
 
 
